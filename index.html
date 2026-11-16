@@ -1,0 +1,1072 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="Arrowvine: a 1000-level arrow puzzle. Clear every arrow by tapping the ones with a free path.">
+<style>
+:root { color-scheme: light; padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px); }
+body { margin: 0; font-size: 14px; }
+[hidden] { display: none !important; }
+</style>
+<title>Arrowvine</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@500;700;800&display=swap">
+<style>
+/* Layout: one full-height app with three screens (home, vine map, board). A coin chip stays top right on every screen. */
+:root {
+  --bg: #f2f4f8;
+  --surface: #ffffff;
+  --surface-2: #e4e8ef;
+  --ink: #171c28;
+  --ink-soft: #667085;
+  --line: #d3d8e2;
+  --vine: #2f64e8;
+  --vine-deep: #1f48b0;
+  --leaf: #7ea2f2;
+  --arrow: #171c28;
+  --coin: #2f64e8;
+  --coin-ink: #ffffff;
+  --bad: #e03a3e;
+  --good: #2f64e8;
+  --shadow: 0 6px 20px rgba(24, 36, 70, .13);
+  --font-display: 'Fredoka', 'Trebuchet MS', system-ui, sans-serif;
+  --font-body: 'Nunito', system-ui, -apple-system, 'Segoe UI', sans-serif;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0e1118; --surface: #1a1f2b; --surface-2: #272e3d; --ink: #eaeef6; --ink-soft: #9aa4b8;
+    --line: #2f3748; --vine: #5b8cff; --vine-deep: #3a69e0; --leaf: #86a9ff; --arrow: #eaeef6;
+    --coin: #5b8cff; --coin-ink: #0b1020; --bad: #ff6b6f; --good: #7fa5ff;
+    --shadow: 0 6px 20px rgba(0, 0, 0, .5); color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0e1118; --surface: #1a1f2b; --surface-2: #272e3d; --ink: #eaeef6; --ink-soft: #9aa4b8;
+  --line: #2f3748; --vine: #5b8cff; --vine-deep: #3a69e0; --leaf: #86a9ff; --arrow: #eaeef6;
+  --coin: #5b8cff; --coin-ink: #0b1020; --bad: #ff6b6f; --good: #7fa5ff;
+  --shadow: 0 6px 20px rgba(0, 0, 0, .5); color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html, body { height: 100%; }
+body {
+  background: var(--bg); color: var(--ink); font-family: var(--font-body); font-size: 16px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  overflow: hidden; -webkit-tap-highlight-color: transparent; user-select: none;
+}
+button { font: inherit; color: inherit; cursor: pointer; border: 0; background: none; }
+button:focus-visible { outline: 3px solid var(--coin); outline-offset: 2px; }
+.screen {
+  position: absolute; inset: 0; display: flex; flex-direction: column;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+}
+.screen[hidden] { display: none; }
+.wrap { width: 100%; max-width: 520px; margin: 0 auto; }
+
+/* top bar + coin chip */
+.bar {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  height: 56px; flex: none; padding-top: env(safe-area-inset-top, 0px);
+  box-sizing: content-box;
+}
+.bar h2 { margin: 0; font: 600 18px/1.1 var(--font-display); text-align: center; min-width: 0; flex: 1; }
+.bar h2 small { display: block; font: 700 12px var(--font-body); color: var(--ink-soft); letter-spacing: .06em; text-transform: uppercase; margin-top: 2px; }
+.round {
+  width: 42px; height: 42px; border-radius: 50%; background: var(--surface); box-shadow: var(--shadow);
+  display: grid; place-items: center; flex: none;
+}
+.round svg { width: 22px; height: 22px; stroke: var(--ink); fill: none; stroke-width: 2.6; stroke-linecap: round; stroke-linejoin: round; }
+.coins {
+  display: flex; align-items: center; gap: 7px; height: 42px; padding: 0 14px 0 8px; border-radius: 21px;
+  background: var(--surface); box-shadow: var(--shadow); font: 600 18px var(--font-display);
+  font-variant-numeric: tabular-nums; flex: none;
+}
+.coin-dot {
+  width: 26px; height: 26px; border-radius: 50%; background: var(--coin); color: var(--coin-ink);
+  display: grid; place-items: center; font: 700 14px var(--font-display); box-shadow: inset 0 -3px 0 rgba(0,0,0,.14);
+}
+.coins.pop { animation: pop .5s ease; }
+@keyframes pop { 30% { transform: scale(1.18); } 100% { transform: scale(1); } }
+
+/* home */
+#home .main { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 22px; padding-bottom: 28px; min-height: 0; }
+.logo { text-align: center; }
+.logo h1 { margin: 0; font: 700 clamp(44px, 12vw, 64px)/1 var(--font-display); letter-spacing: -.01em; color: var(--vine); }
+.logo p { margin: 8px 0 0; color: var(--ink-soft); font-weight: 700; }
+.play {
+  min-width: 200px; height: 62px; border-radius: 31px; background: var(--vine); color: #fff;
+  font: 600 26px var(--font-display); letter-spacing: .02em; box-shadow: 0 6px 0 var(--vine-deep), var(--shadow);
+  transition: transform .12s, box-shadow .12s; display: flex; align-items: center; justify-content: center; gap: 10px;
+}
+.play svg { width: 22px; height: 22px; fill: #fff; }
+.play:active { transform: translateY(5px); box-shadow: 0 1px 0 var(--vine-deep), var(--shadow); }
+.theme { display: flex; align-items: center; gap: 12px; }
+.theme > span { font-weight: 800; font-size: 14px; color: var(--ink-soft); letter-spacing: .06em; text-transform: uppercase; }
+.seg { display: flex; background: var(--surface-2); border-radius: 22px; padding: 4px; gap: 4px; }
+.seg button { height: 36px; padding: 0 16px; border-radius: 18px; font-weight: 800; color: var(--ink-soft); display: flex; align-items: center; gap: 7px; }
+.seg button svg { width: 17px; height: 17px; fill: none; stroke: currentColor; stroke-width: 2.4; stroke-linecap: round; }
+.seg button[aria-pressed="true"] { background: var(--surface); color: var(--ink); box-shadow: 0 2px 8px rgba(0,0,0,.14); }
+.linkish { font-weight: 700; font-size: 13px; color: var(--ink-soft); text-decoration: underline; padding: 6px 10px; }
+
+/* vine map */
+.scroller { flex: 1; overflow-y: auto; overflow-x: hidden; margin: 0 calc(-1 * max(16px, env(safe-area-inset-left, 0px))); padding: 0 max(16px, env(safe-area-inset-left, 0px)); scrollbar-width: thin; }
+.vine { position: relative; margin: 0 auto; width: 100%; max-width: 480px; }
+.vine svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
+.stem { fill: none; stroke: var(--vine); stroke-width: 9; stroke-linecap: round; }
+.stem-hi { fill: none; stroke: var(--leaf); stroke-width: 3; stroke-linecap: round; opacity: .7; }
+.leaf { fill: var(--leaf); opacity: .9; }
+.leaf.alt { fill: var(--vine); }
+.node {
+  position: absolute; width: 58px; height: 58px; transform: translate(-50%, -50%); border-radius: 50%;
+  display: grid; place-items: center; font: 600 22px var(--font-display); font-variant-numeric: tabular-nums;
+  background: var(--surface-2); color: var(--ink-soft); border: 4px solid var(--bg); box-shadow: var(--shadow);
+}
+.node.done { background: var(--vine); color: #fff; }
+.node.current { background: var(--bad); color: #fff; animation: ring 1.8s infinite; }
+.node.locked { opacity: .75; }
+.node:active:not(.locked) { transform: translate(-50%, -50%) scale(.94); }
+.node .lock { position: absolute; right: -4px; bottom: -4px; width: 22px; height: 22px; border-radius: 50%; background: var(--surface); display: grid; place-items: center; box-shadow: 0 1px 4px rgba(0,0,0,.2); }
+.node .lock svg { width: 12px; height: 12px; fill: none; stroke: var(--ink-soft); stroke-width: 2.6; stroke-linecap: round; }
+@keyframes ring { 0% { box-shadow: 0 0 0 0 rgba(224,58,62,.55), var(--shadow); } 70%, 100% { box-shadow: 0 0 0 16px rgba(224,58,62,0), var(--shadow); } }
+.tag {
+  position: absolute; transform: translateY(-50%); font: 700 12px var(--font-body); letter-spacing: .05em; text-transform: uppercase;
+  color: var(--ink-soft); pointer-events: none; white-space: nowrap;
+}
+.tag.l { transform: translate(-100%, -50%); text-align: right; }
+.vine-end { position: absolute; left: 50%; transform: translateX(-50%); text-align: center; font: 600 15px var(--font-display); color: var(--ink-soft); }
+
+/* board: white cube tiles with thin black arrows */
+:root { --slab: #ffffff; --slab-side: #c3c8d0; --tl: 40%; --sl: 24%; --heart: #e5484d; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --slab: #ffffff; --slab-side: #aab0b9; --tl: 64%; --sl: 30%; --heart: #ff6b6f; } }
+:root[data-theme="dark"] { --slab: #ffffff; --slab-side: #aab0b9; --tl: 64%; --sl: 30%; --heart: #ff6b6f; }
+.stagewrap { flex: 1; min-height: 0; position: relative; display: flex; flex-direction: column; margin: 0 calc(-1 * max(16px, env(safe-area-inset-left, 0px))); }
+.stage { flex: 1; min-height: 0; display: flex; overflow: auto; overscroll-behavior: contain; scrollbar-width: thin; padding: 6px; }
+.board { position: relative; margin: auto; flex: none; touch-action: manipulation; filter: drop-shadow(0 10px 10px rgba(20, 30, 60, .25)); }
+.bsvg { display: block; width: 100%; height: auto; overflow: visible; }
+.slabT { fill: var(--slab); }
+.slabS { fill: var(--slab-side); }
+.zoom { position: absolute; right: max(10px, env(safe-area-inset-right, 0px)); bottom: 10px; display: flex; flex-direction: column; gap: 8px; z-index: 5; }
+.zoom button { width: 42px; height: 42px; border-radius: 50%; background: var(--surface); box-shadow: var(--shadow); display: grid; place-items: center; }
+.zoom svg { width: 20px; height: 20px; stroke: var(--ink); stroke-width: 2.8; stroke-linecap: round; fill: none; }
+.zoom button:disabled { opacity: .4; }
+.arw { cursor: pointer; }
+.arw.esc { pointer-events: none; transition: none; }
+.arw.gone { display: none; }
+.arw .hit { fill: none; stroke: transparent; stroke-width: .75; stroke-linecap: round; stroke-linejoin: round; pointer-events: stroke; }
+.arw .ln { fill: none; stroke-width: .12; stroke-linecap: round; stroke-linejoin: round; pointer-events: none; }
+.arw .hd { stroke-width: .04; stroke-linejoin: round; pointer-events: none; }
+.arw .ex.ln { stroke: #8f959e; }
+.arw .ex.hd { fill: #8f959e; stroke: #8f959e; }
+.arw .tp.ln { stroke: #101214; }
+.arw .tp.hd { fill: #101214; stroke: #101214; }
+.arw.blocker .tp.ln { stroke: var(--bad); } .arw.blocker .tp.hd { fill: var(--bad); stroke: var(--bad); }
+.arw.shake { animation: shake .3s; }
+.arw.shake .tp.ln { stroke: var(--bad); } .arw.shake .tp.hd { fill: var(--bad); stroke: var(--bad); }
+.arw.hint .tp.ln { stroke: #2f64e8; stroke-width: .24; } .arw.hint .tp.hd { fill: #2f64e8; stroke: #2f64e8; }
+@keyframes shake { 20% { transform: translate(-.12px, 0); } 50% { transform: translate(.12px, 0); } 80% { transform: translate(-.08px, 0); } }
+.hearts { display: flex; justify-content: center; gap: 8px; flex: none; padding: 2px 0 6px; }
+.heart { width: 40px; height: 36px; display: grid; place-items: center; border-radius: 12px; }
+.heart svg { width: 32px; height: 30px; fill: var(--heart); stroke: var(--heart); stroke-width: 2; stroke-linejoin: round; transition: transform .2s; }
+.heart.empty svg { fill: none; opacity: .6; }
+.heart.lost svg { animation: pop .5s ease; }
+.hearts .timer { align-self: center; font: 700 12px var(--font-body); color: var(--ink-soft); font-variant-numeric: tabular-nums; min-width: 38px; }
+.demo { width: min(70vw, 270px, 27vh); flex: none; display: grid; place-items: center; pointer-events: none; }
+.demo .board { width: 100%; filter: drop-shadow(0 10px 8px rgba(20, 30, 60, .25)); }
+.cost { display: inline-flex; align-items: center; gap: 5px; margin-left: 6px; }
+.cost .coin-dot { width: 20px; height: 20px; font-size: 11px; }
+.card .stack { display: flex; flex-direction: column; gap: 10px; }
+.card .stack button { height: 52px; border-radius: 26px; font: 600 18px var(--font-display); background: var(--surface-2); display: flex; align-items: center; justify-content: center; }
+.card .stack button.main { background: var(--vine); color: #fff; box-shadow: 0 4px 0 var(--vine-deep); }
+.card .stack button:disabled { opacity: .45; cursor: default; }
+.foot { flex: none; display: flex; align-items: center; justify-content: center; gap: 12px; padding: 14px 0 calc(14px + env(safe-area-inset-bottom, 0px)); }
+.pill { height: 46px; padding: 0 18px; border-radius: 23px; background: var(--surface); box-shadow: var(--shadow); font: 600 16px var(--font-display); display: flex; align-items: center; gap: 8px; }
+.pill:disabled { opacity: .45; cursor: default; }
+.pill svg { width: 18px; height: 18px; fill: none; stroke: var(--ink); stroke-width: 2.5; stroke-linecap: round; stroke-linejoin: round; }
+.pill .coin-dot { width: 20px; height: 20px; font-size: 11px; }
+.left { font: 700 13px/1.3 var(--font-body); color: var(--ink-soft); min-width: 84px; text-align: center; font-variant-numeric: tabular-nums; }
+.left b { color: var(--ink); font: 600 16px var(--font-display); }
+.left.low b:last-child { color: var(--bad); }
+
+/* win dialog */
+.modal { position: absolute; inset: 0; background: rgba(10, 14, 28, .55); display: grid; place-items: center; padding: 20px; z-index: 20; }
+.modal[hidden] { display: none; }
+.card { width: min(360px, 100%); background: var(--surface); border-radius: 28px; padding: 28px 22px 22px; text-align: center; box-shadow: var(--shadow); animation: rise .35s ease; }
+@keyframes rise { from { transform: translateY(24px) scale(.96); opacity: 0; } }
+.card h3 { margin: 0; font: 700 30px var(--font-display); color: var(--vine); }
+.card p { margin: 6px 0 0; color: var(--ink-soft); font-weight: 700; }
+.earn { display: flex; align-items: center; justify-content: center; gap: 10px; margin: 20px 0; font: 700 40px var(--font-display); font-variant-numeric: tabular-nums; }
+.earn .coin-dot { width: 40px; height: 40px; font-size: 20px; }
+.bonus { font-size: 13px; font-weight: 800; color: var(--good); margin-top: -12px; margin-bottom: 18px; min-height: 16px; }
+.card .row { display: flex; gap: 10px; }
+.card .row button { flex: 1; height: 52px; border-radius: 26px; font: 600 18px var(--font-display); background: var(--surface-2); }
+.card .row button.main { background: var(--vine); color: #fff; box-shadow: 0 4px 0 var(--vine-deep); }
+#play .bar { position: relative; z-index: 25; }
+.toast { position: fixed; left: 50%; bottom: calc(96px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); background: var(--ink); color: var(--bg); font-weight: 800; font-size: 14px; padding: 9px 16px; border-radius: 18px; z-index: 30; white-space: nowrap; }
+.toast[hidden] { display: none; }
+@media (prefers-reduced-motion: reduce) { * { animation: none !important; transition-duration: .01s !important; } }
+</style>
+</head>
+<body>
+
+<section class="screen" id="home">
+  <div class="wrap bar"><span></span><div class="coins" data-coins aria-label="Coins"><span class="coin-dot">$</span><span class="n">0</span></div></div>
+  <div class="wrap main">
+    <div class="logo"><h1>Arrowvine</h1><p>Clear every arrow. Climb the vine.</p></div>
+    <div class="demo" id="demo" aria-hidden="true"></div>
+    <button class="play" id="playBtn" type="button"><svg viewBox="0 0 24 24"><path d="M7 4.5v15l13-7.5z"/></svg>Play</button>
+    <div class="theme">
+      <span>Screen</span>
+      <div class="seg" role="group" aria-label="Screen brightness">
+        <button type="button" id="themeLight" aria-pressed="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2.5v2.5M12 19v2.5M2.5 12H5M19 12h2.5M5.3 5.3l1.8 1.8M16.9 16.9l1.8 1.8M5.3 18.7l1.8-1.8M16.9 7.1l1.8-1.8"/></svg>Bright</button>
+        <button type="button" id="themeDark" aria-pressed="false"><svg viewBox="0 0 24 24"><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z"/></svg>Dark</button>
+      </div>
+    </div>
+    <button class="linkish" id="unlockBtn" type="button">Unlock all levels</button>
+  </div>
+</section>
+
+<section class="screen" id="map" hidden>
+  <div class="wrap bar">
+    <button class="round" id="mapBack" type="button" aria-label="Back to home"><svg viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></svg></button>
+    <h2>The Vine<small id="mapSub">Level 1 of 1000</small></h2>
+    <div class="coins" data-coins aria-label="Coins"><span class="coin-dot">$</span><span class="n">0</span></div>
+  </div>
+  <div class="scroller" id="scroller"><div class="vine" id="vine"></div></div>
+</section>
+
+<section class="screen" id="play" hidden>
+  <div class="wrap bar">
+    <button class="round" id="playBack" type="button" aria-label="Back to the vine"><svg viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></svg></button>
+    <h2 id="playTitle">Level 1<small>Circle</small></h2>
+    <div class="coins" data-coins aria-label="Coins"><span class="coin-dot">$</span><span class="n">0</span></div>
+  </div>
+  <div class="hearts" id="hearts" aria-label="Lives"></div>
+  <div class="stagewrap">
+    <div class="stage" id="stage"><div class="board" id="board"></div></div>
+    <div class="zoom">
+      <button type="button" id="zIn" aria-label="Zoom in"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></button>
+      <button type="button" id="zOut" aria-label="Zoom out"><svg viewBox="0 0 24 24"><path d="M5 12h14"/></svg></button>
+    </div>
+  </div>
+  <div class="wrap foot">
+    <button class="pill" id="restartBtn" type="button"><svg viewBox="0 0 24 24"><path d="M4 12a8 8 0 1 0 2.6-5.9M4 4v4.5h4.5"/></svg>Restart</button>
+    <button class="pill" id="hintBtn" type="button"><svg viewBox="0 0 24 24"><path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-3.5 10.9c.6.5 1 1.2 1 2.1h5c0-.9.4-1.6 1-2.1A6 6 0 0 0 12 3z"/></svg>Hint <span class="coin-dot">5</span></button>
+  </div>
+  <div class="modal" id="lose" hidden>
+    <div class="card" role="dialog" aria-labelledby="loseTitle">
+      <h3 id="loseTitle" style="color:var(--bad)">Out of lives</h3>
+      <p id="loseSub">Buy a heart with your coins to keep going.</p>
+      <div class="bonus" id="loseTimer" style="color:var(--ink-soft);margin:14px 0 16px"></div>
+      <div class="stack">
+        <button type="button" class="main" id="buyOne">Buy 1 life <span class="cost"><span class="coin-dot">$</span>30</span></button>
+        <button type="button" id="buyAll">Refill all 3 <span class="cost"><span class="coin-dot">$</span>90</span></button>
+        <button type="button" id="loseRestart">Restart level</button>
+        <button type="button" id="loseMap">Back to the vine</button>
+      </div>
+    </div>
+  </div>
+  <div class="modal" id="win" hidden>
+    <div class="card" role="dialog" aria-labelledby="winTitle">
+      <h3 id="winTitle">Level cleared!</h3>
+      <p id="winSub">Circle</p>
+      <div class="earn"><span class="coin-dot">$</span><span id="winCoins">+0</span></div>
+      <div class="bonus" id="winBonus"></div>
+      <div class="row"><button type="button" id="winMap">Vine</button><button type="button" class="main" id="winNext">Next</button></div>
+    </div>
+  </div>
+  </section>
+<div class="toast" id="toast" hidden></div>
+<script>
+/* Level generator. Shapes are masks on an n x n grid; arrows are assigned by
+   peeling the shape from the outside in, so every level can be cleared. */
+const Levels = (function () {
+  const TOTAL = 1000, ARROW_CAP = 360, MAX_N = 50;
+  const DX = [0, 1, 0, -1], DY = [-1, 0, 1, 0]; // 0 up, 1 right, 2 down, 3 left
+
+  function rng(seed) {
+    let a = seed >>> 0;
+    return function () {
+      a = (a + 0x6D2B79F5) >>> 0;
+      let t = a;
+      t = Math.imul(t ^ (t >>> 15), t | 1);
+      t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+  }
+  function pip(poly, x, y) {
+    let c = false;
+    for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+      const xi = poly[i][0], yi = poly[i][1], xj = poly[j][0], yj = poly[j][1];
+      if ((yi > y) !== (yj > y) && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi) c = !c;
+    }
+    return c;
+  }
+  const any = (polys, x, y) => polys.some((p) => pip(p, x, y));
+  const circ = (x, y, cx, cy, r) => (x - cx) * (x - cx) + (y - cy) * (y - cy) <= r * r;
+  const rad = (x, y) => Math.sqrt(x * x + y * y);
+  const ang = (x, y) => Math.atan2(y, x);
+  function starPoly(k, ro, ri) {
+    const pts = [];
+    for (let m = 0; m < k * 2; m++) {
+      const r = m % 2 === 0 ? ro : ri, t = -Math.PI / 2 + (m * Math.PI) / k;
+      pts.push([r * Math.cos(t), r * Math.sin(t)]);
+    }
+    return pts;
+  }
+  const STAR = starPoly(5, 1, 0.42);
+  const BOLT = [[0.25, -1], [-0.55, 0.15], [-0.05, 0.15], [-0.3, 1], [0.6, -0.2], [0.1, -0.2], [0.5, -1]];
+  const CROWN = [[-1, 0.8], [-1, -0.65], [-0.5, 0.05], [0, -0.9], [0.5, 0.05], [1, -0.65], [1, 0.8]];
+  const MOUNT = [[-1, 0.85], [-0.4, -0.5], [-0.15, -0.1], [0.3, -0.95], [1, 0.85]];
+  const TREE = [[[0, -1], [-0.55, -0.2], [0.55, -0.2]], [[0, -0.6], [-0.8, 0.35], [0.8, 0.35]], [[0, -0.2], [-1, 0.7], [1, 0.7]]];
+  const BOAT = [[[0, -1], [0, 0.5], [-0.75, 0.5]], [[0.1, -0.7], [0.1, 0.5], [0.8, 0.5]], [[-0.9, 0.62], [0.9, 0.62], [0.6, 0.95], [-0.6, 0.95]]];
+  const EAR_L = [[-0.72, -0.92], [-0.7, -0.05], [-0.1, -0.45]];
+  const EAR_R = [[0.72, -0.92], [0.7, -0.05], [0.1, -0.45]];
+
+  const SHAPES = [
+    ['Circle', (x, y) => rad(x, y) <= 1],
+    ['Diamond', (x, y) => Math.abs(x) + Math.abs(y) <= 1],
+    ['Plus', (x, y) => Math.abs(x) <= 0.36 || Math.abs(y) <= 0.36],
+    ['Heart', (x, y) => { const X = x * 1.25, Y = -y * 1.25 + 0.15, a = X * X + Y * Y - 1; return a * a * a - X * X * Y * Y * Y <= 0; }],
+    ['Ring', (x, y) => { const r = rad(x, y); return r >= 0.5 && r <= 1; }],
+    ['Triangle', (x, y) => Math.abs(x) <= (y + 0.95) / 1.9 && y <= 0.95],
+    ['Hexagon', (x, y) => Math.abs(y) <= 0.87 && 0.87 * Math.abs(x) + 0.5 * Math.abs(y) <= 0.87],
+    ['Star', (x, y) => pip(STAR, x, y)],
+    ['Flower', (x, y) => rad(x, y) <= Math.max(0.3, 0.55 + 0.45 * Math.cos(5 * ang(x, y)))],
+    ['Cross', (x, y) => Math.abs(x - y) <= 0.4 || Math.abs(x + y) <= 0.4],
+    ['Hourglass', (x, y) => Math.abs(x) <= Math.abs(y) + 0.06],
+    ['Bowtie', (x, y) => Math.abs(y) <= Math.abs(x) + 0.06],
+    ['Arrow', (x, y) => (y <= 0 && Math.abs(x) <= (y + 1) * 0.95) || (Math.abs(x) <= 0.3 && y >= -0.1)],
+    ['House', (x, y) => (pip([[-1, -0.05], [0, -0.95], [1, -0.05]], x, y)) || (Math.abs(x) <= 0.75 && y >= -0.05 && !(Math.abs(x) <= 0.2 && y >= 0.45))],
+    ['Crescent', (x, y) => rad(x, y) <= 1 && !circ(x, y, 0.45, -0.05, 0.8)],
+    ['Spiral', (x, y) => { const r = rad(x, y); if (r > 1) return false; if (r < 0.14) return true; const s = (((r * 2.3 - ang(x, y) / (2 * Math.PI)) % 1) + 1) % 1; return s < 0.55; }],
+    ['Mosaic', (x, y, i, j) => rad(x, y) <= 1 && ((i >> 1) + (j >> 1)) % 2 === 0],
+    ['Stairs', (x, y, i, j) => i <= j],
+    ['Lattice', (x, y, i, j) => i % 2 === 0 || j % 2 === 0],
+    ['Frame', (x, y) => Math.max(Math.abs(x), Math.abs(y)) >= 0.58],
+    ['Target', (x, y) => { const r = rad(x, y); return r <= 1 && (r <= 0.28 || (r >= 0.5 && r <= 0.78)); }],
+    ['Lens', (x, y) => circ(x, y, -0.55, 0, 1.05) && circ(x, y, 0.55, 0, 1.05)],
+    ['Drop', (x, y) => circ(x, y, 0, 0.35, 0.62) || pip([[0, -1], [-0.58, 0.1], [0.58, 0.1]], x, y)],
+    ['Bolt', (x, y) => pip(BOLT, x, y)],
+    ['Crown', (x, y) => pip(CROWN, x, y)],
+    ['Mountain', (x, y) => pip(MOUNT, x, y)],
+    ['Cat', (x, y) => circ(x, y, 0, 0.2, 0.72) || pip(EAR_L, x, y) || pip(EAR_R, x, y)],
+    ['Fish', (x, y) => !circ(x, y, -0.55, -0.1, 0.1) && ((((x + 0.2) / 0.8) ** 2 + (y / 0.55) ** 2 <= 1) || pip([[0.5, 0], [1, -0.55], [1, 0.55]], x, y))],
+    ['Mushroom', (x, y) => (circ(x, y, 0, 0.1, 0.95) && y <= 0.1) || (Math.abs(x) <= 0.3 && y >= 0.1)],
+    ['Butterfly', (x, y) => { const a = Math.abs(x); return (Math.abs(x) <= 0.1 && Math.abs(y) <= 0.8) || circ(a, y, 0.5, -0.42, 0.5) || circ(a, y, 0.38, 0.45, 0.4); }],
+    ['Snowman', (x, y) => circ(x, y, 0, 0.5, 0.45) || circ(x, y, 0, -0.15, 0.33) || circ(x, y, 0, -0.68, 0.26)],
+    ['Cloud', (x, y) => circ(x, y, -0.5, 0.15, 0.42) || circ(x, y, -0.1, -0.15, 0.52) || circ(x, y, 0.45, 0.05, 0.42) || (y >= 0.15 && y <= 0.57 && Math.abs(x) <= 0.85)],
+    ['Sun', (x, y) => { const r = rad(x, y); return r <= 0.5 || (r >= 0.68 && r <= 1 && Math.cos(8 * ang(x, y)) > 0.25); }],
+    ['Gear', (x, y) => { const r = rad(x, y); return r >= 0.28 && r <= 0.72 + (Math.cos(8 * ang(x, y)) > 0 ? 0.28 : 0); }],
+    ['Smiley', (x, y) => { const r = rad(x, y); return r <= 1 && !circ(x, y, -0.35, -0.28, 0.16) && !circ(x, y, 0.35, -0.28, 0.16) && !(r >= 0.52 && r <= 0.72 && y >= 0.15); }],
+    ['Chomper', (x, y) => rad(x, y) <= 1 && !(x > 0 && Math.abs(y) <= x * 0.62) && !circ(x, y, 0.1, -0.5, 0.12)],
+    ['Hash', (x, y) => Math.max(Math.abs(x), Math.abs(y)) <= 1 && (Math.abs(Math.abs(x) - 0.38) <= 0.16 || Math.abs(Math.abs(y) - 0.38) <= 0.16)],
+    ['Leaf', (x, y) => { const u = (x + y) * 0.7071, v = (x - y) * 0.7071; return circ(u, v, 0, 0.5, 1.12) && circ(u, v, 0, -0.5, 1.12); }],
+    ['Pine', (x, y) => any(TREE, x, y) || (Math.abs(x) <= 0.14 && y >= 0.7)],
+    ['Sailboat', (x, y) => any(BOAT, x, y)],
+  ];
+
+  function gridSize(level) {
+    const L = level - 1, tier = Math.floor(L / 40), p = L % 40;
+    return { tier, p, n: 6 + tier * 2 + Math.floor(p / 20) };
+  }
+  function makeMask(shape, n, tier) {
+    const tq = tier % 4, fx = tq === 1 || tq === 3, fy = tq === 2 || tq === 3;
+    const g = [];
+    let count = 0;
+    for (let j = 0; j < n; j++) {
+      g.push([]);
+      for (let i = 0; i < n; i++) {
+        const ii = fx ? n - 1 - i : i, jj = fy ? n - 1 - j : j;
+        const x = ((ii + 0.5) / n) * 2 - 1, y = ((jj + 0.5) / n) * 2 - 1;
+        const on = !!shape[1](x, y, ii, jj);
+        g[j].push(on);
+        if (on) count++;
+      }
+    }
+    return { g, count };
+  }
+
+  const cache = {};
+  // each arrow is a path of cells (tail to head). The head points d and its ray must be clear to leave.
+  // grow arrows from the outside in; every arrow is removable when its turn comes, so the level is always solvable
+  function generate(orig, n, count, rand, diff, minLen, maxLen) {
+    const rem = orig.map((r) => r.slice());
+    const owner = new Array(n * n).fill(-1);
+    const arrows = [];
+    let remaining = count;
+    while (remaining > 0) {
+      const cand = [];
+      let total = 0;
+      for (let j = 0; j < n; j++) for (let i = 0; i < n; i++) {
+        if (!rem[j][i]) continue;
+        for (let d = 0; d < 4; d++) {
+          let x = i + DX[d], y = j + DY[d], blockers = 0, clear = true;
+          while (x >= 0 && y >= 0 && x < n && y < n) {
+            if (rem[y][x]) { clear = false; break; }
+            if (orig[y][x]) blockers++;
+            x += DX[d]; y += DY[d];
+          }
+          if (!clear) continue;
+          const w = Math.exp(blockers * (diff * 1.1 - 0.55));
+          cand.push([i, j, d, w]);
+          total += w;
+        }
+      }
+      // sample several head candidates and keep the one that snakes furthest
+      let best = null;
+      const tries = Math.min(40, cand.length * 2);
+      for (let tr = 0; tr < tries; tr++) {
+        let r = rand() * total, pick = cand[cand.length - 1];
+        for (const c of cand) { r -= c[3]; if (r <= 0) { pick = c; break; } }
+        const [hi, hj, d] = pick;
+        const path = [[hi, hj]];
+        const used = new Set([hj * n + hi]);
+        const want = minLen + Math.floor(rand() * (maxLen - minLen + 1));
+        let ci = hi - DX[d], cj = hj - DY[d];
+        if (ci >= 0 && cj >= 0 && ci < n && cj < n && rem[cj][ci]) {
+          path.push([ci, cj]); used.add(cj * n + ci);
+          let lastDir = d;
+          while (path.length < want) {
+            const opts = [];
+            for (let e = 0; e < 4; e++) {
+              const x = ci + DX[e], y = cj + DY[e];
+              if (x < 0 || y < 0 || x >= n || y >= n || !rem[y][x] || used.has(y * n + x)) continue;
+              let f = 0;
+              for (let u = 0; u < 4; u++) {
+                const a2 = x + DX[u], b2 = y + DY[u];
+                if (a2 >= 0 && b2 >= 0 && a2 < n && b2 < n && rem[b2][a2] && !used.has(b2 * n + a2)) f++;
+              }
+              // prefer cells with few free neighbours so tails don't strand cells, and favour turns
+              opts.push([x, y, e, (1 / (1 + f * f)) * (e === lastDir ? 1 : 1.5)]);
+            }
+            if (!opts.length) break;
+            let t = 0; opts.forEach((o) => (t += o[3]));
+            let q = rand() * t, o = opts[opts.length - 1];
+            for (const c of opts) { q -= c[3]; if (q <= 0) { o = c; break; } }
+            ci = o[0]; cj = o[1]; lastDir = o[2];
+            path.push([ci, cj]); used.add(cj * n + ci);
+          }
+        }
+        if (path.length < 2) continue;
+        // a cell left with no free neighbour once this path is taken would become a one-square arrow
+        const orphans = [], seen = new Set();
+        path.forEach(([x, y]) => {
+          for (let f = 0; f < 4; f++) {
+            const u = x + DX[f], v = y + DY[f];
+            if (u < 0 || v < 0 || u >= n || v >= n || !rem[v][u] || used.has(v * n + u) || seen.has(v * n + u)) continue;
+            seen.add(v * n + u);
+            let free = 0;
+            for (let g2 = 0; g2 < 4; g2++) {
+              const uu = u + DX[g2], vv = v + DY[g2];
+              if (uu >= 0 && vv >= 0 && uu < n && vv < n && rem[vv][uu] && !used.has(vv * n + uu)) free++;
+            }
+            if (free === 0) orphans.push([u, v]);
+          }
+        });
+        if (orphans.length === 1) {
+          const tail = path[path.length - 1], o = orphans[0];
+          if (Math.abs(tail[0] - o[0]) + Math.abs(tail[1] - o[1]) === 1) { path.push(o); orphans.length = 0; }
+        }
+        if (!best || orphans.length < best.orphans || (orphans.length === best.orphans && path.length > best.path.length)) best = { path, d, hi, hj, orphans: orphans.length };
+        if (!orphans.length && path.length >= want) break;
+      }
+      if (!best) { const c = cand[0]; best = { path: [[c[0], c[1]]], d: c[2], hi: c[0], hj: c[1], orphans: 0 }; }
+      const { path, d, hi, hj } = best;
+      path.reverse();
+      const idx = arrows.length;
+      path.forEach(([x, y]) => { rem[y][x] = false; owner[y * n + x] = idx; });
+      remaining -= path.length;
+      arrows.push({ cells: path, d, i: hi, j: hj });
+    }
+    return arrows;
+  }
+
+  function get(level) {
+    if (cache[level]) return cache[level];
+    const { tier, p } = gridSize(level);
+    const shape = SHAPES[p];
+    // arrow count: 35 on level 1, +5 per level, up to a ceiling that still fits a phone screen
+    const target = Math.min(ARROW_CAP, 30 + 5 * level);
+    const wantCells = Math.round(target * (3.2 + Math.min(1, level / 80)));
+    let n = 8, m;
+    for (;;) {
+      m = makeMask(shape, n, tier);
+      if (m.count >= wantCells || n >= MAX_N) break;
+      n++;
+    }
+    const orig = m.g;
+    for (let j = 0; j < n; j++) for (let i = 0; i < n; i++) {
+      if (!orig[j][i]) continue;
+      const hasNb = (i > 0 && orig[j][i - 1]) || (i < n - 1 && orig[j][i + 1]) || (j > 0 && orig[j - 1][i]) || (j < n - 1 && orig[j + 1][i]);
+      if (!hasNb) { orig[j][i] = false; m.count--; }
+    }
+    const diff = Math.min(1, (level - 1) / 160);
+    const wantAvg = m.count / target;
+    let maxLen = Math.max(2, Math.round(2 * wantAvg - 2)), best = null;
+    for (let attempt = 0; attempt < 4; attempt++) {
+      const arrows = generate(orig, n, m.count, rng(level * 7919 + 13 + attempt * 101), diff, 2, maxLen);
+      repairSingles(arrows, n);
+      const leftover = arrows.filter((x) => x.cells.length < 2).length;
+      for (let k = arrows.length - 1; k >= 0; k--) if (arrows[k].cells.length < 2) arrows.splice(k, 1);
+      const err = Math.abs(arrows.length - target), score = err + leftover * 3;
+      if (!best || score < best.score) best = { arrows, leftover, score };
+      if (err <= Math.max(1, Math.round(target * 0.015)) && leftover <= 2) break;
+      if (maxLen <= 3 && arrows.length < target) break; // this shape cannot hold more arrows
+      const nowAvg = (m.count - leftover) / Math.max(1, arrows.length);
+      maxLen = Math.max(2, Math.min(80, Math.round(2 + (maxLen - 2) * wantAvg / nowAvg)));
+    }
+    const { arrows, leftover } = best;
+    // only tiles that carry an arrow stay on the board
+    const covered = new Set();
+    arrows.forEach((ar) => ar.cells.forEach(([x, y]) => covered.add(y * n + x)));
+    const mask = [];
+    for (let j = 0; j < n; j++) for (let i = 0; i < n; i++) if (covered.has(j * n + i)) mask.push([i, j]);
+    const slack = 0;
+    return (cache[level] = { level, name: shape[0], n, arrows, mask, count: arrows.length, cellCount: mask.length, empty: 0, dropped: leftover, slack, moves: arrows.length + slack });
+  }
+
+  // alive: grid of arrow index (or -1) for arrows still on the board
+  function aliveGrid(lv, flags) {
+    const g = new Array(lv.n * lv.n).fill(-1);
+    lv.arrows.forEach((a, k) => { if (flags[k]) a.cells.forEach(([x, y]) => (g[y * lv.n + x] = k)); });
+    return g;
+  }
+  function isFree(g, n, a) {
+    let x = a.i + DX[a.d], y = a.j + DY[a.d];
+    while (x >= 0 && y >= 0 && x < n && y < n) {
+      if (g[y * n + x] !== -1) return false;
+      x += DX[a.d]; y += DY[a.d];
+    }
+    return true;
+  }
+  function blockerOf(g, n, a) {
+    let x = a.i + DX[a.d], y = a.j + DY[a.d];
+    while (x >= 0 && y >= 0 && x < n && y < n) {
+      if (g[y * n + x] !== -1) return g[y * n + x];
+      x += DX[a.d]; y += DY[a.d];
+    }
+    return -1;
+  }
+  function solvable(lv) {
+    const n = lv.n, g = aliveGrid(lv, lv.arrows.map(() => true));
+    const done = new Array(lv.arrows.length).fill(false);
+    let left = done.length, progress = true, firstFree = 0;
+    lv.arrows.forEach((a) => { if (isFree(g, n, a)) firstFree++; });
+    while (left > 0 && progress) {
+      progress = false;
+      for (let k = 0; k < lv.arrows.length; k++) {
+        if (done[k] || !isFree(g, n, lv.arrows[k])) continue;
+        done[k] = true; left--; progress = true;
+        lv.arrows[k].cells.forEach(([x, y]) => (g[y * n + x] = -1));
+      }
+    }
+    return { ok: left === 0, firstFree };
+  }
+  // join any one-cell arrow onto a neighbour so every arrow is at least 2 squares long (each change is re-checked for solvability)
+  function repairSingles(arrows, n) {
+    const dirOf = (dx, dy) => { for (let e = 0; e < 4; e++) if (DX[e] === dx && DY[e] === dy) return e; return -1; };
+    const trial = (mut, undo, drop) => {
+      mut();
+      const idx = arrows.indexOf(drop);
+      arrows.splice(idx, 1);
+      if (solvable({ n, arrows }).ok) return true;
+      arrows.splice(idx, 0, drop);
+      undo();
+      return false;
+    };
+    for (let guard = 0; guard < 400; guard++) {
+      const A = arrows.find((x) => x.cells.length === 1 && !x.stuck);
+      if (!A) return;
+      const [cx, cy] = A.cells[0], at = new Map();
+      arrows.forEach((B) => B.cells.forEach(([x, y]) => at.set(y * n + x, B)));
+      let fixed = false;
+      for (let e = 0; e < 4 && !fixed; e++) {
+        const nx = cx + DX[e], ny = cy + DY[e];
+        if (nx < 0 || ny < 0 || nx >= n || ny >= n) continue;
+        const B = at.get(ny * n + nx);
+        if (!B || B === A) continue;
+        if (B.cells.length === 1) {
+          // two singles become one pair; try both orientations
+          const bc = B.cells[0], save = { cells: B.cells, d: B.d, i: B.i, j: B.j };
+          const back = () => { B.cells = save.cells; B.d = save.d; B.i = save.i; B.j = save.j; };
+          fixed = trial(() => { B.cells = [[cx, cy], bc]; B.d = dirOf(bc[0] - cx, bc[1] - cy); B.i = bc[0]; B.j = bc[1]; }, back, A)
+            || trial(() => { B.cells = [bc, [cx, cy]]; B.d = dirOf(cx - bc[0], cy - bc[1]); B.i = cx; B.j = cy; }, back, A);
+          continue;
+        }
+        const t = B.cells[0];
+        if (t[0] === nx && t[1] === ny) {                      // add to the tail end
+          fixed = trial(() => B.cells.unshift([cx, cy]), () => B.cells.shift(), A);
+        } else if (B.i === nx && B.j === ny) {                 // grow the head into this cell, turning if needed
+          const sv = { i: B.i, j: B.j, d: B.d };
+          fixed = trial(() => { B.cells.push([cx, cy]); B.i = cx; B.j = cy; B.d = dirOf(cx - nx, cy - ny); }, () => { B.cells.pop(); B.i = sv.i; B.j = sv.j; B.d = sv.d; }, A);
+        }
+      }
+      // otherwise split a longer neighbour in two so this cell can join one half
+      for (let e = 0; e < 4 && !fixed; e++) {
+        const nx = cx + DX[e], ny = cy + DY[e];
+        if (nx < 0 || ny < 0 || nx >= n || ny >= n) continue;
+        const B = at.get(ny * n + nx);
+        if (!B || B === A || B.cells.length < 4) continue;
+        const k = B.cells.findIndex(([x, y]) => x === nx && y === ny);
+        const orig = { cells: B.cells };
+        const cs = B.cells, last = cs.length - 1;
+        const tries = [];
+        if (last - k - 1 >= 2) tries.push('s1');   // head half keeps its head; tail half grows into this cell
+        if (k >= 2) tries.push('s2');              // tail half gets a new head; this cell joins the head half's tail
+        for (const kind of tries) {
+          let X;
+          if (kind === 's1') {
+            X = { cells: cs.slice(0, k + 1).concat([[cx, cy]]), d: dirOf(cx - nx, cy - ny), i: cx, j: cy };
+            B.cells = cs.slice(k + 1);
+          } else {
+            const p0 = cs[k - 2], p1 = cs[k - 1];
+            X = { cells: cs.slice(0, k), d: dirOf(p1[0] - p0[0], p1[1] - p0[1]), i: p1[0], j: p1[1] };
+            B.cells = [[cx, cy]].concat(cs.slice(k));
+          }
+          const ai = arrows.indexOf(A);
+          arrows.splice(ai, 1); arrows.push(X);
+          if (solvable({ n, arrows }).ok) { fixed = true; break; }
+          arrows.pop(); arrows.splice(ai, 0, A); B.cells = orig.cells;
+        }
+      }
+      // otherwise borrow the end cell of a longer neighbour and pair it with this cell
+      for (let e = 0; e < 4 && !fixed; e++) {
+        const nx = cx + DX[e], ny = cy + DY[e];
+        if (nx < 0 || ny < 0 || nx >= n || ny >= n) continue;
+        const B = at.get(ny * n + nx);
+        if (!B || B === A || B.cells.length < 3) continue;
+        const t = B.cells[0];
+        if (t[0] !== nx || t[1] !== ny) continue;
+        const keep = { cells: B.cells };
+        const afterB = B.cells.slice(1);
+        for (const [headFirst, d2] of [[true, dirOf(cx - nx, cy - ny)], [false, dirOf(nx - cx, ny - cy)]]) {
+          const saveA = { cells: A.cells, d: A.d, i: A.i, j: A.j };
+          B.cells = afterB;
+          if (headFirst) { A.cells = [[nx, ny], [cx, cy]]; A.d = d2; A.i = cx; A.j = cy; }
+          else { A.cells = [[cx, cy], [nx, ny]]; A.d = d2; A.i = nx; A.j = ny; }
+          if (solvable({ n, arrows }).ok) { fixed = true; break; }
+          B.cells = keep.cells; A.cells = saveA.cells; A.d = saveA.d; A.i = saveA.i; A.j = saveA.j;
+        }
+      }
+      if (!fixed) A.stuck = true; else arrows.forEach((x) => (x.stuck = false));
+    }
+  }
+  function reward(level, count, mistakes) {
+    return 10 + count + Math.floor(level / 10) * 2 + (mistakes === 0 ? 10 : 0);
+  }
+  return { TOTAL, DX, DY, SHAPES, get, aliveGrid, isFree, blockerOf, solvable, reward, rng, names: SHAPES.map((s) => s[0]) };
+})();
+if (typeof module !== 'undefined') module.exports = Levels;
+/* ---- app core: state, theme, coins, navigation ---- */
+const $ = (s) => document.querySelector(s);
+const KEY = 'arrowvine.v1';
+const S = { coins: 0, done: {}, theme: null, all: false };
+try {
+  const raw = JSON.parse(localStorage.getItem(KEY) || 'null');
+  if (raw && typeof raw === 'object') {
+    S.coins = +raw.coins || 0; S.done = raw.done || {}; S.theme = raw.theme || null; S.all = !!raw.all;
+  }
+} catch (e) { /* storage unavailable: play without saving */ }
+function save() { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) {} }
+
+function currentLevel() { for (let k = 1; k <= Levels.TOTAL; k++) if (!S.done[k]) return k; return Levels.TOTAL; }
+function unlocked(k) { return S.all || k <= currentLevel(); }
+
+/* theme */
+const root = document.documentElement;
+const mq = window.matchMedia ? window.matchMedia('(prefers-color-scheme: dark)') : null;
+function effectiveTheme() { return S.theme || root.dataset.theme || (mq && mq.matches ? 'dark' : 'light'); }
+function applyTheme() {
+  if (S.theme) root.dataset.theme = S.theme;
+  const t = effectiveTheme();
+  $('#themeLight').setAttribute('aria-pressed', String(t === 'light'));
+  $('#themeDark').setAttribute('aria-pressed', String(t === 'dark'));
+}
+$('#themeLight').onclick = () => { S.theme = 'light'; applyTheme(); save(); };
+$('#themeDark').onclick = () => { S.theme = 'dark'; applyTheme(); save(); };
+
+/* coins (chip is top right on every screen) */
+let shownCoins = S.coins;
+function paintCoins(v) { document.querySelectorAll('[data-coins] .n').forEach((e) => (e.textContent = v)); }
+function addCoins(delta) {
+  const from = S.coins;
+  S.coins = Math.max(0, S.coins + delta);
+  save();
+  const to = S.coins, t0 = performance.now(), dur = 700;
+  document.querySelectorAll('[data-coins]').forEach((e) => { e.classList.remove('pop'); void e.offsetWidth; e.classList.add('pop'); });
+  (function step(now) {
+    const f = Math.min(1, (now - t0) / dur);
+    shownCoins = Math.round(from + (to - from) * f);
+    paintCoins(shownCoins);
+    if (f < 1) requestAnimationFrame(step);
+  })(t0);
+}
+
+/* toast */
+let toastTimer = 0;
+function toast(msg) {
+  const t = $('#toast');
+  t.textContent = msg; t.hidden = false;
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => (t.hidden = true), 1800);
+}
+
+/* navigation */
+let screen = 'home';
+function show(name) {
+  screen = name;
+  ['home', 'map', 'play'].forEach((id) => ($('#' + id).hidden = id !== name));
+  if (name === 'home') startDemo(); else stopDemo();
+  if (name === 'map') buildMap(true);
+}
+$('#playBtn').onclick = () => show('map');
+$('#mapBack').onclick = () => show('home');
+$('#playBack').onclick = () => show('map');
+$('#unlockBtn').onclick = () => {
+  S.all = !S.all; save();
+  $('#unlockBtn').textContent = S.all ? 'Lock levels again' : 'Unlock all levels';
+  toast(S.all ? `All ${Levels.TOTAL} levels unlocked` : 'Levels unlock in order again');
+};
+let rzTimer = 0;
+window.addEventListener('resize', () => {
+  clearTimeout(rzTimer);
+  rzTimer = setTimeout(() => {
+    if (screen === 'play') sizeBoard(true);
+    if (screen === 'map') buildMap(false);
+  }, 120);
+});
+
+/* lives: every round starts with 3 hearts; a lost heart can be bought back with coins */
+const MAX_LIVES = 3, LIFE_COST = 30;
+function buyLives(count) {
+  const need = Math.min(count, MAX_LIVES - G.lives), cost = need * LIFE_COST;
+  if (need <= 0) return false;
+  if (S.coins < cost) { toast(`You need ${cost} coins`); return false; }
+  addCoins(-cost);
+  G.lives += need;
+  return true;
+}
+/* ---- the vine map: level 1 at the bottom, the last level at the top ---- */
+const GAP = 98, PAD_TOP = 130, PAD_BOTTOM = 90, NS = 'http://www.w3.org/2000/svg';
+let mapGeo = null;
+
+function buildMap(scrollToCurrent) {
+  const vine = $('#vine'), scroller = $('#scroller');
+  const W = vine.clientWidth;
+  if (!W) return;
+  const prevTop = scroller.scrollTop;
+  const H = PAD_TOP + (Levels.TOTAL - 1) * GAP + PAD_BOTTOM;
+  const A = Math.min(W * 0.3, 120);
+  const pt = (k) => ({ x: W / 2 + A * Math.sin((k - 1) * 0.82), y: H - PAD_BOTTOM - (k - 1) * GAP, k });
+
+  const pts = [{ x: W / 2, y: H + 10 }];
+  for (let k = 1; k <= Levels.TOTAL; k++) pts.push(pt(k));
+  pts.push({ x: W / 2 + A * Math.sin(Levels.TOTAL * 0.82) * 0.6, y: 40 });
+
+  /* smooth path through the level points (Catmull-Rom to cubic Bezier) */
+  let d = `M${pts[0].x.toFixed(1)} ${pts[0].y.toFixed(1)}`;
+  const segs = [];
+  for (let i = 0; i < pts.length - 1; i++) {
+    const p0 = pts[Math.max(0, i - 1)], p1 = pts[i], p2 = pts[i + 1], p3 = pts[Math.min(pts.length - 1, i + 2)];
+    const c1x = p1.x + (p2.x - p0.x) / 6, c1y = p1.y + (p2.y - p0.y) / 6, c2x = p2.x - (p3.x - p1.x) / 6, c2y = p2.y - (p3.y - p1.y) / 6;
+    d += ` C${c1x.toFixed(1)} ${c1y.toFixed(1)} ${c2x.toFixed(1)} ${c2y.toFixed(1)} ${p2.x.toFixed(1)} ${p2.y.toFixed(1)}`;
+    segs.push([p1.x, p1.y, c1x, c1y, c2x, c2y, p2.x, p2.y]);
+  }
+
+  vine.style.height = H + 'px';
+  vine.innerHTML = '';
+  const svg = document.createElementNS(NS, 'svg');
+  svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
+  svg.setAttribute('aria-hidden', 'true');
+  const path = document.createElementNS(NS, 'path');
+  path.setAttribute('d', d); path.setAttribute('class', 'stem');
+  const hi = path.cloneNode(); hi.setAttribute('class', 'stem-hi'); hi.setAttribute('transform', 'translate(-1.5 0)');
+  svg.appendChild(path); svg.appendChild(hi);
+  vine.appendChild(svg);
+
+  /* leaves along the stem, placed straight from the curve segments (measuring a very long path is slow) */
+  const r = Levels.rng(42);
+  const bz = (s, t) => {
+    const u = 1 - t, k0 = u * u * u, k1 = 3 * u * u * t, k2 = 3 * u * t * t, k3 = t * t * t;
+    return [k0 * s[0] + k1 * s[2] + k2 * s[4] + k3 * s[6], k0 * s[1] + k1 * s[3] + k2 * s[5] + k3 * s[7]];
+  };
+  let leaves = '', side = 1;
+  segs.forEach((sg) => {
+    for (let t = 0.12 + r() * 0.2; t < 0.95; t += 0.3 + r() * 0.22) {
+      const p = bz(sg, t), q = bz(sg, t + 0.02);
+      const ang = Math.atan2(q[1] - p[1], q[0] - p[0]) * 180 / Math.PI;
+      const rot = ang + side * (50 + r() * 25), sc = 0.8 + r() * 0.7;
+      leaves += `<path class="leaf${r() > 0.6 ? ' alt' : ''}" transform="translate(${p[0].toFixed(1)} ${p[1].toFixed(1)}) rotate(${rot.toFixed(0)}) scale(${sc.toFixed(2)})" d="M0 0Q8 -11 24 -5Q11 9 0 0Z"/>`;
+      side = -side;
+    }
+  });
+  const g = document.createElementNS(NS, 'g');
+  g.innerHTML = leaves;
+  svg.insertBefore(g, hi);
+
+  /* level nodes + shape tags */
+  const cur = currentLevel();
+  const frag = document.createDocumentFragment();
+  for (let k = 1; k <= Levels.TOTAL; k++) {
+    const p = pts[k], open = unlocked(k);
+    const b = document.createElement('button');
+    b.type = 'button'; b.dataset.k = k;
+    b.className = 'node' + (S.done[k] ? ' done' : k === cur ? ' current' : '') + (open ? '' : ' locked');
+    b.style.left = p.x + 'px'; b.style.top = p.y + 'px';
+    const name = Levels.names[(k - 1) % 40];
+    b.setAttribute('aria-label', `Level ${k}, ${name}${open ? '' : ', locked'}`);
+    b.innerHTML = k + (open ? '' : '<span class="lock"><svg viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg></span>');
+    frag.appendChild(b);
+    const t = document.createElement('span');
+    const right = p.x < W / 2;
+    t.className = 'tag' + (right ? '' : ' l');
+    t.textContent = name;
+    t.style.top = p.y + 'px';
+    t.style.left = (p.x + (right ? 40 : -40)) + 'px';
+    frag.appendChild(t);
+  }
+  const end = document.createElement('div');
+  end.className = 'vine-end'; end.style.top = '8px'; end.textContent = 'Top of the vine';
+  frag.appendChild(end);
+  vine.appendChild(frag);
+
+  mapGeo = { H, pts };
+  $('#mapSub').textContent = `Level ${cur} of ${Levels.TOTAL}`;
+  if (scrollToCurrent) scroller.scrollTop = Math.max(0, pts[cur].y - scroller.clientHeight * 0.62);
+  else scroller.scrollTop = prevTop;
+}
+
+$('#vine').addEventListener('click', (e) => {
+  const b = e.target.closest('.node');
+  if (!b) return;
+  const k = +b.dataset.k;
+  if (!unlocked(k)) { toast(`Clear level ${currentLevel()} first`); return; }
+  startLevel(k);
+});
+/* ---- 3D board: slab tiles with extruded arrow lines ---- */
+const HUES = [38, 198, 285, 152, 350];
+function arrowPath(a) { return 'M' + a.cells.map(([x, y]) => `${x + 0.5} ${y + 0.5}`).join('L'); }
+function headPoly(a) {
+  const dx = Levels.DX[a.d], dy = Levels.DY[a.d], cx = a.i + 0.5, cy = a.j + 0.5, px = -dy, py = dx;
+  const pt = (f, s) => `${(cx + dx * f + px * s).toFixed(3)} ${(cy + dy * f + py * s).toFixed(3)}`;
+  return `${pt(0.48, 0)} ${pt(-0.1, 0.27)} ${pt(-0.1, -0.27)}`;
+}
+function mkBoard(host, lv) {
+  const n = lv.n;
+  let slabS = '', slabT = '', arr = '';
+  lv.mask.forEach(([i, j]) => {
+    slabS += `<rect class="slabS" x="${i + 0.04}" y="${j + 0.24}" width="0.92" height="0.76" rx="0.1"/>`;
+    slabT += `<rect class="slabT" x="${i + 0.04}" y="${j + 0.04}" width="0.92" height="0.76" rx="0.1"/>`;
+  });
+  lv.arrows.forEach((a, k) => {
+    const d = arrowPath(a), h = headPoly(a);
+    arr += `<g class="arw" data-idx="${k}" style="--h:${HUES[k % HUES.length]}">` +
+      `<g transform="translate(0 0.07)"><path class="ln ex" d="${d}"/><polygon class="hd ex" points="${h}"/></g>` +
+      `<path class="ln tp" d="${d}"/><polygon class="hd tp" points="${h}"/><path class="hit" d="${d}"/></g>`;
+  });
+  host.innerHTML = `<svg class="bsvg" viewBox="-0.5 -0.5 ${n + 1} ${n + 1.9}" role="img" aria-label="Arrow puzzle">${slabS}${slabT}${arr}</svg>`;
+  return Array.from(host.querySelectorAll('.arw'));
+}
+/* escape: the arrow slithers along its own path, the body following the head round each bend, then out past the edge */
+const calmMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+function headAt(x, y, dx, dy) {
+  const px = -dy, py = dx, pt = (f, s) => `${(x + dx * f + px * s).toFixed(3)} ${(y + dy * f + py * s).toFixed(3)}`;
+  return `${pt(0.48, 0)} ${pt(-0.1, 0.27)} ${pt(-0.1, -0.27)}`;
+}
+function flyOut(g, a, n) {
+  g.classList.add('esc');
+  const lines = g.querySelectorAll('.ln'), heads = g.querySelectorAll('.hd');
+  if (calmMotion) { g.style.transition = 'opacity .2s'; g.style.opacity = 0; setTimeout(() => g.classList.add('gone'), 220); return 220; }
+  const dx = Levels.DX[a.d], dy = Levels.DY[a.d];
+  const pts = a.cells.map(([x, y]) => [x + 0.5, y + 0.5]);
+  let body = 0;
+  for (let k = 1; k < pts.length; k++) body += Math.hypot(pts[k][0] - pts[k - 1][0], pts[k][1] - pts[k - 1][1]);
+  const edge = dx > 0 ? n - a.i - 0.5 : dx < 0 ? a.i + 0.5 : dy > 0 ? n - a.j - 0.5 : a.j + 0.5;
+  const ext = body + edge + 1;
+  const hx = pts[pts.length - 1][0], hy = pts[pts.length - 1][1];
+  pts.push([hx + dx * ext, hy + dy * ext]);
+  const cum = [0];
+  for (let k = 1; k < pts.length; k++) cum.push(cum[k - 1] + Math.hypot(pts[k][0] - pts[k - 1][0], pts[k][1] - pts[k - 1][1]));
+  const at = (s) => {
+    s = Math.max(0, Math.min(cum[cum.length - 1], s));
+    let k = 1;
+    while (k < cum.length - 1 && cum[k] < s) k++;
+    const seg = cum[k] - cum[k - 1] || 1, f = (s - cum[k - 1]) / seg;
+    const ux = (pts[k][0] - pts[k - 1][0]) / seg, uy = (pts[k][1] - pts[k - 1][1]) / seg;
+    return { x: pts[k - 1][0] + (pts[k][0] - pts[k - 1][0]) * f, y: pts[k - 1][1] + (pts[k][1] - pts[k - 1][1]) * f, ux, uy, k };
+  };
+  const sStart = body, sEnd = body + edge + body + 0.9, dist = sEnd - sStart;
+  const dur = Math.min(1150, 420 + dist * 34);
+  const t0 = performance.now();
+  (function frame(now) {
+    const t = Math.min(1, (now - t0) / dur), e = Math.pow(t, 1.7);
+    const s = sStart + dist * e, tail = Math.max(0, s - body);
+    const h = at(s), tl = at(tail);
+    let d = `M${tl.x.toFixed(3)} ${tl.y.toFixed(3)}`;
+    for (let k = tl.k; k < h.k; k++) d += `L${pts[k][0].toFixed(3)} ${pts[k][1].toFixed(3)}`;
+    d += `L${h.x.toFixed(3)} ${h.y.toFixed(3)}`;
+    lines.forEach((l) => l.setAttribute('d', d));
+    const poly = headAt(h.x, h.y, h.ux, h.uy);
+    heads.forEach((p) => p.setAttribute('points', poly));
+    g.style.opacity = t > 0.7 ? String(1 - (t - 0.7) / 0.3) : '1';
+    if (t < 1) requestAnimationFrame(frame); else g.classList.add('gone');
+  })(t0);
+  return dur;
+}
+
+/* ---- home demo: a small board that clears itself on a loop ---- */
+let demoTimer = 0;
+function startDemo() {
+  stopDemo();
+  const host = $('#demo'), lv = Levels.get(1);
+  host.innerHTML = '<div class="board"></div>';
+  const bh = host.firstChild;
+  let els, flags;
+  const reset = () => { els = mkBoard(bh, lv); flags = lv.arrows.map(() => true); };
+  reset();
+  demoTimer = setInterval(() => {
+    const g = Levels.aliveGrid(lv, flags), free = [];
+    lv.arrows.forEach((a, i) => { if (flags[i] && Levels.isFree(g, lv.n, a)) free.push(i); });
+    if (!free.length) { reset(); return; }
+    const i = free[Math.floor(Math.random() * free.length)];
+    flags[i] = false; flyOut(els[i], lv.arrows[i], lv.n);
+  }, 420);
+}
+function stopDemo() { clearInterval(demoTimer); demoTimer = 0; }
+
+/* ---- hearts ---- */
+const HEART = '<svg viewBox="0 0 24 22"><path d="M12 20.5C5 15.5 2 12 2 8.2 2 5.2 4.3 3 7.1 3c2 0 3.8 1.1 4.9 2.9C13.1 4.1 14.9 3 16.9 3 19.7 3 22 5.2 22 8.2c0 3.8-3 7.3-10 12.3z"/></svg>';
+function paintHearts(lostIdx) {
+  const box = $('#hearts');
+  let h = '';
+  for (let i = 0; i < MAX_LIVES; i++) {
+    h += `<button type="button" class="heart${i < G.lives ? '' : ' empty'}${i === lostIdx ? ' lost' : ''}" data-h="${i}" aria-label="${i < G.lives ? 'Life' : 'Empty life, buy for ' + LIFE_COST + ' coins'}">${HEART}</button>`;
+  }
+  box.innerHTML = h;
+}
+$('#hearts').addEventListener('click', (e) => {
+  if (!e.target.closest('.heart.empty')) return;
+  if (G && !G.busy && buyLives(1)) { paintHearts(); toast('Life bought'); }
+});
+
+/* ---- game ---- */
+let G = null;
+/* zoom: the board is fitted to the screen, then scaled up so dense boards stay tappable */
+const Z_MAX = 7;
+function fitSide() {
+  const stage = $('#stage'), n = G.lv.n;
+  const w = stage.clientWidth - 12, h = stage.clientHeight - 12;
+  return Math.max(140, Math.min(w, 620, (h * (n + 1)) / (n + 1.9)));
+}
+function sizeBoard(keepView) {
+  if (!G) return;
+  const stage = $('#stage'), board = $('#board');
+  const fit = fitSide(), cell = fit / (G.lv.n + 1);
+  if (!G.zoom) G.zoom = Math.max(1, Math.min(Z_MAX, 12 / cell));
+  const fx = keepView ? (stage.scrollLeft + stage.clientWidth / 2) / Math.max(1, stage.scrollWidth) : 0.5;
+  const fy = keepView ? (stage.scrollTop + stage.clientHeight / 2) / Math.max(1, stage.scrollHeight) : 0.5;
+  board.style.width = Math.round(fit * G.zoom) + 'px';
+  stage.scrollLeft = fx * stage.scrollWidth - stage.clientWidth / 2;
+  stage.scrollTop = fy * stage.scrollHeight - stage.clientHeight / 2;
+  $('#zIn').disabled = G.zoom >= Z_MAX - 0.01;
+  $('#zOut').disabled = G.zoom <= 1.01;
+}
+function zoomBy(f) {
+  if (!G) return;
+  G.zoom = Math.max(1, Math.min(Z_MAX, G.zoom * f));
+  sizeBoard(true);
+}
+$('#zIn').onclick = () => zoomBy(1.4);
+$('#zOut').onclick = () => zoomBy(1 / 1.4);
+function startLevel(k) {
+  const lv = Levels.get(k);
+  G = { k, lv, flags: lv.arrows.map(() => true), left: lv.count, lives: MAX_LIVES, mistakes: 0, busy: false };
+  $('#playTitle').innerHTML = `Level ${k}<small>${lv.name}</small>`;
+  $('#win').hidden = true; $('#lose').hidden = true;
+  show('play');
+  G.els = mkBoard($('#board'), lv);
+  sizeBoard(); paintHearts();
+  setTimeout(() => { if (G && G.k < Levels.TOTAL) Levels.get(G.k + 1); }, 700);
+}
+
+function openLose() {
+  G.busy = true;
+  $('#lose').hidden = false;
+  paintLose();
+}
+function paintLose() {
+  const miss = MAX_LIVES - G.lives;
+  $('#buyOne').disabled = S.coins < LIFE_COST;
+  $('#buyAll').disabled = S.coins < LIFE_COST * miss;
+  $('#buyAll').firstChild.textContent = `Refill all ${miss} `;
+  $('#buyAll .cost').lastChild.textContent = LIFE_COST * miss;
+  $('#loseTimer').textContent = S.coins < LIFE_COST ? 'Not enough coins for a heart. Restart the level for 3 new hearts.' : `You have ${S.coins} coins.`;
+}
+function resume() { $('#lose').hidden = true; G.busy = false; paintHearts(); }
+$('#buyOne').onclick = () => { if (buyLives(1)) resume(); };
+$('#buyAll').onclick = () => { if (buyLives(MAX_LIVES - G.lives)) resume(); };
+$('#loseRestart').onclick = () => startLevel(G.k);
+$('#loseMap').onclick = () => show('map');
+
+$('#board').addEventListener('click', (e) => {
+  const el = e.target.closest('.arw');
+  if (!el || !G || G.busy || el.classList.contains('esc')) return;
+  const i = +el.dataset.idx, a = G.lv.arrows[i], n = G.lv.n;
+  const grid = Levels.aliveGrid(G.lv, G.flags);
+  if (Levels.isFree(grid, n, a)) {
+    G.flags[i] = false; G.left--;
+    const dur = flyOut(el, a, n);
+    if (G.left === 0) { G.busy = true; setTimeout(winLevel, dur + 150); }
+    return;
+  }
+  /* blocked: lose a life, shake it and show which arrow is in the way */
+  G.mistakes++;
+  const lostIdx = G.lives - 1;
+  G.lives--;
+  paintHearts(lostIdx);
+  const bi = Levels.blockerOf(grid, n, a), be = G.els[bi];
+  el.classList.remove('shake'); void el.getBoundingClientRect(); el.classList.add('shake');
+  if (be) be.classList.add('blocker');
+  setTimeout(() => { el.classList.remove('shake'); if (be) be.classList.remove('blocker'); }, 700);
+  try { navigator.vibrate && navigator.vibrate(30); } catch (err) {}
+  if (G.lives <= 0) { G.busy = true; setTimeout(openLose, 450); }
+});
+
+$('#restartBtn').onclick = () => { if (G) startLevel(G.k); };
+$('#hintBtn').onclick = () => {
+  if (!G || G.busy) return;
+  if (S.coins < 5) { toast('You need 5 coins for a hint'); return; }
+  const grid = Levels.aliveGrid(G.lv, G.flags), free = [];
+  G.lv.arrows.forEach((a, i) => { if (G.flags[i] && Levels.isFree(grid, G.lv.n, a)) free.push(i); });
+  if (!free.length) return;
+  const el = G.els[free[Math.floor(Math.random() * free.length)]];
+  addCoins(-5);
+  el.classList.add('hint');
+  setTimeout(() => el.classList.remove('hint'), 2500);
+};
+
+function winLevel() {
+  const k = G.k, replay = !!S.done[k];
+  let gain = Levels.reward(k, G.lv.count, G.mistakes);
+  if (replay) gain = Math.max(1, Math.ceil(gain / 4));
+  S.done[k] = true;
+  $('#winTitle').textContent = G.mistakes === 0 ? 'Perfect clear!' : 'Level cleared!';
+  $('#winSub').textContent = `Level ${k} · ${G.lv.name}`;
+  $('#winCoins').textContent = '+' + gain;
+  $('#winBonus').textContent = replay ? 'Replay reward' : G.mistakes === 0 ? 'No wrong taps: +10 bonus included' : '';
+  $('#winNext').hidden = k >= Levels.TOTAL;
+  $('#win').hidden = false;
+  addCoins(gain);
+}
+$('#winNext').onclick = () => startLevel(Math.min(Levels.TOTAL, G.k + 1));
+$('#winMap').onclick = () => show('map');
+
+/* ---- boot ---- */
+applyTheme();
+paintCoins(S.coins);
+$('#unlockBtn').textContent = S.all ? 'Lock levels again' : 'Unlock all levels';
+show('home');
+</script>
+</body>
+</html>
