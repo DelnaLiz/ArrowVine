@@ -4,6 +4,13 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="description" content="Arrowvine: a 1000-level arrow puzzle. Clear every arrow by tapping the ones with a free path.">
+<meta name="theme-color" content="#2f64e8">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Arrowvine">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" type="image/png" href="icon-192.png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
 <style>
 :root { color-scheme: light; padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px); }
 body { margin: 0; font-size: 14px; }
@@ -53,7 +60,7 @@ body {
   background: var(--bg); color: var(--ink); font-family: var(--font-body); font-size: 16px;
   padding-left: max(16px, env(safe-area-inset-left, 0px));
   padding-right: max(16px, env(safe-area-inset-right, 0px));
-  overflow: hidden; -webkit-tap-highlight-color: transparent; user-select: none;
+  overflow: hidden; -webkit-tap-highlight-color: transparent; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; touch-action: manipulation; overscroll-behavior: none;
 }
 button { font: inherit; color: inherit; cursor: pointer; border: 0; background: none; }
 button:focus-visible { outline: 3px solid var(--coin); outline-offset: 2px; }
@@ -73,7 +80,7 @@ button:focus-visible { outline: 3px solid var(--coin); outline-offset: 2px; }
 .bar h2 { margin: 0; font: 600 18px/1.1 var(--font-display); text-align: center; min-width: 0; flex: 1; }
 .bar h2 small { display: block; font: 700 12px var(--font-body); color: var(--ink-soft); letter-spacing: .06em; text-transform: uppercase; margin-top: 2px; }
 .round {
-  width: 42px; height: 42px; border-radius: 50%; background: var(--surface); box-shadow: var(--shadow);
+  width: 46px; height: 46px; border-radius: 50%; background: var(--surface); box-shadow: var(--shadow);
   display: grid; place-items: center; flex: none;
 }
 .round svg { width: 22px; height: 22px; stroke: var(--ink); fill: none; stroke-width: 2.6; stroke-linecap: round; stroke-linejoin: round; }
@@ -90,7 +97,8 @@ button:focus-visible { outline: 3px solid var(--coin); outline-offset: 2px; }
 @keyframes pop { 30% { transform: scale(1.18); } 100% { transform: scale(1); } }
 
 /* home */
-#home .main { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 22px; padding-bottom: 28px; min-height: 0; }
+#home { overflow-y: auto; }
+#home .main { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: safe center; gap: 22px; padding-bottom: 28px; min-height: min-content; }
 .logo { text-align: center; }
 .logo h1 { margin: 0; font: 700 clamp(44px, 12vw, 64px)/1 var(--font-display); letter-spacing: -.01em; color: var(--vine); }
 .logo p { margin: 8px 0 0; color: var(--ink-soft); font-weight: 700; }
@@ -141,19 +149,20 @@ button:focus-visible { outline: 3px solid var(--coin); outline-offset: 2px; }
 @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --slab: #ffffff; --slab-side: #aab0b9; --tl: 64%; --sl: 30%; --heart: #ff6b6f; } }
 :root[data-theme="dark"] { --slab: #ffffff; --slab-side: #aab0b9; --tl: 64%; --sl: 30%; --heart: #ff6b6f; }
 .stagewrap { flex: 1; min-height: 0; position: relative; display: flex; flex-direction: column; margin: 0 calc(-1 * max(16px, env(safe-area-inset-left, 0px))); }
-.stage { flex: 1; min-height: 0; display: flex; overflow: auto; overscroll-behavior: contain; scrollbar-width: thin; padding: 6px; }
-.board { position: relative; margin: auto; flex: none; touch-action: manipulation; filter: drop-shadow(0 10px 10px rgba(20, 30, 60, .25)); }
+.stage { flex: 1; min-height: 0; display: flex; overflow: auto; overscroll-behavior: contain; scrollbar-width: none; padding: 6px; touch-action: none; }
+.board { position: relative; margin: auto; flex: none; touch-action: none; }
+.board.soft { filter: drop-shadow(0 10px 10px rgba(20, 30, 60, .25)); }
 .bsvg { display: block; width: 100%; height: auto; overflow: visible; }
 .slabT { fill: var(--slab); }
 .slabS { fill: var(--slab-side); }
 .zoom { position: absolute; right: max(10px, env(safe-area-inset-right, 0px)); bottom: 10px; display: flex; flex-direction: column; gap: 8px; z-index: 5; }
-.zoom button { width: 42px; height: 42px; border-radius: 50%; background: var(--surface); box-shadow: var(--shadow); display: grid; place-items: center; }
+.zoom button { width: 48px; height: 48px; border-radius: 50%; background: var(--surface); box-shadow: var(--shadow); display: grid; place-items: center; }
 .zoom svg { width: 20px; height: 20px; stroke: var(--ink); stroke-width: 2.8; stroke-linecap: round; fill: none; }
 .zoom button:disabled { opacity: .4; }
 .arw { cursor: pointer; }
 .arw.esc { pointer-events: none; transition: none; }
 .arw.gone { display: none; }
-.arw .hit { fill: none; stroke: transparent; stroke-width: .75; stroke-linecap: round; stroke-linejoin: round; pointer-events: stroke; }
+.arw .hit { fill: none; stroke: transparent; stroke-width: var(--hit, .75); stroke-linecap: round; stroke-linejoin: round; pointer-events: stroke; }
 .arw .ln { fill: none; stroke-width: .12; stroke-linecap: round; stroke-linejoin: round; pointer-events: none; }
 .arw .hd { stroke-width: .04; stroke-linejoin: round; pointer-events: none; }
 .arw .ex.ln { stroke: #8f959e; }
@@ -166,7 +175,7 @@ button:focus-visible { outline: 3px solid var(--coin); outline-offset: 2px; }
 .arw.hint .tp.ln { stroke: #2f64e8; stroke-width: .24; } .arw.hint .tp.hd { fill: #2f64e8; stroke: #2f64e8; }
 @keyframes shake { 20% { transform: translate(-.12px, 0); } 50% { transform: translate(.12px, 0); } 80% { transform: translate(-.08px, 0); } }
 .hearts { display: flex; justify-content: center; gap: 8px; flex: none; padding: 2px 0 6px; }
-.heart { width: 40px; height: 36px; display: grid; place-items: center; border-radius: 12px; }
+.heart { width: 46px; height: 42px; display: grid; place-items: center; border-radius: 12px; }
 .heart svg { width: 32px; height: 30px; fill: var(--heart); stroke: var(--heart); stroke-width: 2; stroke-linejoin: round; transition: transform .2s; }
 .heart.empty svg { fill: none; opacity: .6; }
 .heart.lost svg { animation: pop .5s ease; }
@@ -180,7 +189,7 @@ button:focus-visible { outline: 3px solid var(--coin); outline-offset: 2px; }
 .card .stack button.main { background: var(--vine); color: #fff; box-shadow: 0 4px 0 var(--vine-deep); }
 .card .stack button:disabled { opacity: .45; cursor: default; }
 .foot { flex: none; display: flex; align-items: center; justify-content: center; gap: 12px; padding: 14px 0 calc(14px + env(safe-area-inset-bottom, 0px)); }
-.pill { height: 46px; padding: 0 18px; border-radius: 23px; background: var(--surface); box-shadow: var(--shadow); font: 600 16px var(--font-display); display: flex; align-items: center; gap: 8px; }
+.pill { height: 48px; padding: 0 18px; border-radius: 23px; background: var(--surface); box-shadow: var(--shadow); font: 600 16px var(--font-display); display: flex; align-items: center; gap: 8px; }
 .pill:disabled { opacity: .45; cursor: default; }
 .pill svg { width: 18px; height: 18px; fill: none; stroke: var(--ink); stroke-width: 2.5; stroke-linecap: round; stroke-linejoin: round; }
 .pill .coin-dot { width: 20px; height: 20px; font-size: 11px; }
@@ -206,8 +215,7 @@ button:focus-visible { outline: 3px solid var(--coin); outline-offset: 2px; }
 .toast[hidden] { display: none; }
 @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition-duration: .01s !important; } }
 </style>
-</head>
-<body>
+</head><body>
 
 <section class="screen" id="home">
   <div class="wrap bar"><span></span><div class="coins" data-coins aria-label="Coins"><span class="coin-dot">$</span><span class="n">0</span></div></div>
@@ -959,26 +967,76 @@ function fitSide() {
   const w = stage.clientWidth - 12, h = stage.clientHeight - 12;
   return Math.max(140, Math.min(w, 620, (h * (n + 1)) / (n + 1.9)));
 }
-function sizeBoard(keepView) {
-  if (!G) return;
-  const stage = $('#stage'), board = $('#board');
-  const fit = fitSide(), cell = fit / (G.lv.n + 1);
-  if (!G.zoom) G.zoom = Math.max(1, Math.min(Z_MAX, 12 / cell));
-  const fx = keepView ? (stage.scrollLeft + stage.clientWidth / 2) / Math.max(1, stage.scrollWidth) : 0.5;
-  const fy = keepView ? (stage.scrollTop + stage.clientHeight / 2) / Math.max(1, stage.scrollHeight) : 0.5;
-  board.style.width = Math.round(fit * G.zoom) + 'px';
-  stage.scrollLeft = fx * stage.scrollWidth - stage.clientWidth / 2;
-  stage.scrollTop = fy * stage.scrollHeight - stage.clientHeight / 2;
+const clampZoom = (z) => Math.max(1, Math.min(Z_MAX, z));
+/* board width follows the zoom; the invisible tap area around each arrow stays at least ~15px wide on screen */
+function applySize() {
+  const board = $('#board'), n = G.lv.n, fit = fitSide();
+  const w = Math.round(fit * G.zoom), cell = w / (n + 1);
+  board.style.width = w + 'px';
+  board.style.setProperty('--hit', Math.max(0.75, Math.min(2.4, 15 / cell)).toFixed(2));
   $('#zIn').disabled = G.zoom >= Z_MAX - 0.01;
   $('#zOut').disabled = G.zoom <= 1.01;
 }
+function sizeBoard(keepView) {
+  if (!G) return;
+  const stage = $('#stage'), n = G.lv.n;
+  if (!G.zoom) G.zoom = clampZoom(13 / (fitSide() / (n + 1)));
+  const fx = keepView ? (stage.scrollLeft + stage.clientWidth / 2) / Math.max(1, stage.scrollWidth) : 0.5;
+  const fy = keepView ? (stage.scrollTop + stage.clientHeight / 2) / Math.max(1, stage.scrollHeight) : 0.5;
+  applySize();
+  stage.scrollLeft = fx * stage.scrollWidth - stage.clientWidth / 2;
+  stage.scrollTop = fy * stage.scrollHeight - stage.clientHeight / 2;
+}
+/* zoom while keeping the point under (cx, cy) fixed on screen */
+function zoomAt(z, cx, cy) {
+  if (!G) return;
+  const stage = $('#stage'), r = stage.getBoundingClientRect(), px = cx - r.left, py = cy - r.top;
+  const fx = (stage.scrollLeft + px) / Math.max(1, stage.scrollWidth), fy = (stage.scrollTop + py) / Math.max(1, stage.scrollHeight);
+  G.zoom = clampZoom(z);
+  applySize();
+  stage.scrollLeft = fx * stage.scrollWidth - px;
+  stage.scrollTop = fy * stage.scrollHeight - py;
+}
 function zoomBy(f) {
   if (!G) return;
-  G.zoom = Math.max(1, Math.min(Z_MAX, G.zoom * f));
-  sizeBoard(true);
+  const r = $('#stage').getBoundingClientRect();
+  zoomAt(G.zoom * f, r.left + r.width / 2, r.top + r.height / 2);
 }
 $('#zIn').onclick = () => zoomBy(1.4);
 $('#zOut').onclick = () => zoomBy(1 / 1.4);
+
+/* touch: one finger drags the board, two fingers pinch to zoom; a drag never counts as a tap */
+const gest = { moved: false, pinch: null, pan: null }, ptrs = new Map();
+(function () {
+  const stage = $('#stage');
+  const two = () => { const [a, b] = [...ptrs.values()]; return { d: Math.hypot(a.x - b.x, a.y - b.y) || 1, x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 }; };
+  stage.addEventListener('pointerdown', (e) => {
+    if (e.pointerType === 'mouse') return;
+    ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (ptrs.size === 1) { gest.moved = false; gest.pan = { x: e.clientX, y: e.clientY, sl: stage.scrollLeft, st: stage.scrollTop }; }
+    else if (ptrs.size === 2 && G) { gest.pinch = { d: two().d, z: G.zoom }; gest.pan = null; gest.moved = true; }
+  });
+  stage.addEventListener('pointermove', (e) => {
+    const p = ptrs.get(e.pointerId);
+    if (!p) return;
+    p.x = e.clientX; p.y = e.clientY;
+    if (gest.pinch && ptrs.size === 2 && G) { const t = two(); zoomAt(gest.pinch.z * t.d / gest.pinch.d, t.x, t.y); }
+    else if (gest.pan && ptrs.size === 1) {
+      const dx = e.clientX - gest.pan.x, dy = e.clientY - gest.pan.y;
+      if (!gest.moved && Math.hypot(dx, dy) > 8) gest.moved = true;
+      if (gest.moved) { stage.scrollLeft = gest.pan.sl - dx; stage.scrollTop = gest.pan.st - dy; }
+    }
+  });
+  const end = (e) => {
+    ptrs.delete(e.pointerId);
+    if (ptrs.size < 2) gest.pinch = null;
+    if (ptrs.size === 0) gest.pan = null;
+    else if (ptrs.size === 1) { const [p] = [...ptrs.values()]; gest.pan = { x: p.x, y: p.y, sl: stage.scrollLeft, st: stage.scrollTop }; }
+  };
+  stage.addEventListener('pointerup', end);
+  stage.addEventListener('pointercancel', end);
+  stage.addEventListener('wheel', (e) => { if (!e.ctrlKey || !G) return; e.preventDefault(); zoomAt(G.zoom * (e.deltaY < 0 ? 1.15 : 1 / 1.15), e.clientX, e.clientY); }, { passive: false });
+})();
 function startLevel(k) {
   const lv = Levels.get(k);
   G = { k, lv, flags: lv.arrows.map(() => true), left: lv.count, lives: MAX_LIVES, mistakes: 0, busy: false };
@@ -986,6 +1044,7 @@ function startLevel(k) {
   $('#win').hidden = true; $('#lose').hidden = true;
   show('play');
   G.els = mkBoard($('#board'), lv);
+  $('#board').classList.toggle('soft', lv.n <= 16);
   sizeBoard(); paintHearts();
   setTimeout(() => { if (G && G.k < Levels.TOTAL) Levels.get(G.k + 1); }, 700);
 }
@@ -1011,11 +1070,13 @@ $('#loseMap').onclick = () => show('map');
 
 $('#board').addEventListener('click', (e) => {
   const el = e.target.closest('.arw');
+  if (gest.moved) { gest.moved = false; return; }
   if (!el || !G || G.busy || el.classList.contains('esc')) return;
   const i = +el.dataset.idx, a = G.lv.arrows[i], n = G.lv.n;
   const grid = Levels.aliveGrid(G.lv, G.flags);
   if (Levels.isFree(grid, n, a)) {
     G.flags[i] = false; G.left--;
+    try { navigator.vibrate && navigator.vibrate(8); } catch (err) {}
     const dur = flyOut(el, a, n);
     if (G.left === 0) { G.busy = true; setTimeout(winLevel, dur + 150); }
     return;
@@ -1068,5 +1129,5 @@ paintCoins(S.coins);
 $('#unlockBtn').textContent = S.all ? 'Lock levels again' : 'Unlock all levels';
 show('home');
 </script>
-</body>
-</html>
+<script>if ('serviceWorker' in navigator && location.protocol.indexOf('http') === 0) window.addEventListener('load', function () { navigator.serviceWorker.register('sw.js').catch(function () {}); });</script>
+</body></html>
